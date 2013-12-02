@@ -5,8 +5,8 @@
 # repository
 # by Tor Nilsson Ohrn in 2013
 
-LOGFILE=~/thingsbook/TIMELOG.md
-TEMPFILE=~/thingsbook/.timestamp.txt
+LOGFILE=$(pwd | sed 's/.*/TIMELOG.md/')
+TEMPFILE=$(pwd | sed 's/.*/.timestamp/')
 
 function is_paused() {
 	# see if the paused flag is in the tempfile
@@ -34,7 +34,7 @@ function get_total() {
 }
 
 if [ -z "$1" ]; then
-	echo "thingsbook time tracker needs to be run as: tb [start/paus/stop/log]"
+	echo "the project time tracker needs to be run as: tb [init/start/paus/stop/log] in the root folder of your project"
 # start time tracking if already running task is not detected in tempfile
 elif [ $1 == "start" ]; then
 
@@ -51,7 +51,7 @@ elif [ $1 == "start" ]; then
 			echo "start:"$NEWSTART >> $TEMPFILE
 			echo "continuing timetracking ..."
 		else 
-			echo "timetracking already running"
+			echo $(pwd | sed 's/.*\///')" timetracking already running"
 		fi
 
 	else 
@@ -60,7 +60,7 @@ elif [ $1 == "start" ]; then
 		echo "start:"$START > $TEMPFILE
 		echo "elapsed:0" >> $TEMPFILE
 
-		echo "thingsbook timelogger started!"
+		echo $(pwd | sed 's/.*\///')" timelogger started!"
 	fi
 
 elif [ $1 == "paus" ]; then
@@ -126,4 +126,13 @@ elif [ $1 == "log" ]; then
 	else 
 		echo "no timetracking session running"
 	fi
+elif [ $1 == "init" ]; then
+	if [ -e $LOGFILE ]; then
+		echo "already existing timetracking log for "$(pwd | sed 's/.*\///')
+	else 
+		printf "## Timelog\n" > $LOGFILE
+		echo "initiated the project time tracker for project "$(pwd | sed 's/.*\///')
+	fi
+else 
+	echo "the project time tracker needs to be run as: tb [start/paus/stop/log]"
 fi
