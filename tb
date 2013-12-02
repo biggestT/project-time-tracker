@@ -1,0 +1,129 @@
+#!/bin/bash
+
+# Utility shell script for tracking time spent on different tasks of a project
+# Output is directed to a markdownfile that can be put in the project's git 
+# repository
+# by Tor Nilsson Ohrn in 2013
+
+LOGFILE=~/thingsbook/TIMELOG.md
+TEMPFILE=~/thingsbook/.timestamp.txt
+
+function is_paused() {
+	# see if the paused flag is in the tempfile
+	local isPaused=$(grep 'paused' $TEMPFILE | wc -l)
+	[ $isPaused -ne 0 ] && return 0 || return 1
+}
+function get_elapsed() {
+	# find the elapsed seconds in the tempfile
+	local elapsed=$(grep 'elapsed:[0-9]\{1,12\}$' $TEMPFILE | sed -e s/elapsed://)
+	echo $elapsed
+}
+function get_start() {
+	# find the UTC timestamp in the tempfile
+	local start=$(grep 'start:[0-9]\{10,12\}$' $TEMPFILE | sed -e s/start://)
+	echo $start
+}
+
+function get_total() {
+ total_hrs=`grep -o '[0-9]\{1,3\}.hrs' $LOGFILE | sed -e s/.hrs// | awk '{hrs+=$1} END {printf hrs}'`
+ total_min=`grep -o '[0-9]\{1,2\}.min' $LOGFILE | sed -e s/.min// | awk '{min+=$1} END {printf min}'`
+
+ total_hrs=$(($total_hrs + $total_min / 60))
+ total_min=$(($total_min % 60))
+ echo $total_hrs" hours and "$total_min" minutes "
+}
+
+if [ -z "$1" ]; then
+	echo "thingsbook time tracker needs to be run as: tb [start/paus/stop/log]"
+# start time tracking if already running task is not detected in tempfile
+elif [ $1 == "start" ]; then
+
+	if [ -e $TEMPFILE ]; then
+
+		# ISPAUSED=$(grep 'paused' $TEMPFILE | wc -l)
+
+		if ( is_paused ) then
+
+			NEWSTART=$(date +%s)
+
+			# remove paused variable in tempfile and add a new start time
+			sed -i 's/paused//' $TEMPFILE
+			echo "start:"$NEWSTART >> $TEMPFILE
+			echo "continuing timetracking ..."
+		else 
+			echo "timetracking already running"
+		fi
+
+	else 
+		START=$(date +%s)
+
+		echo "start:"$START > $TEMPFILE
+		echo "elapsed:0" >> $TEMPFILE
+
+		echo "thingsbook timelogger started!"
+	fi
+
+elif [ $1 == "paus" ]; then
+	if [ -e $TEMPFILE  ]; then
+		if ( is_paused ) then
+			echo "timetracking already paused"
+		else 
+			ELAPSED=$(get_elapsed)
+			START=$(get_start)
+			PAUS=$(date +%s)
+			NEWTOTAL=$(expr $PAUS - $START + $ELAPSED)
+			# save the so far elapsed time in the tempfile
+			echo "elapsed:"$NEWTOTAL > $TEMPFILE
+			echo "paused" >> $TEMPFILE
+			echo "timetracking paused"
+		fi
+	else 
+		echo "no existing timetracking session can be found in $TEMPFILE"
+	fi
+
+# stop timetracking and add it to log.md
+elif [ $1 == "stop" ]; then
+
+
+	# see if starting timestamp exists
+	if [ -e $TEMPFILE  ]; then
+
+		read -e -p $'what did you work with?\n' TASK
+
+		STOP=$(date +%s)
+		# remove any old total time spent line from the logfile
+		sed -i 's/^###.Total time spent:.*$//' $LOGFILE
+
+		if ( is_paused ) then
+			START=$STOP
+		else 
+			START=$(get_start)
+		fi
+
+		ELAPSED=$(get_elapsed)
+		
+		DAY=$(date +%F)
+		TOTAL=$(( $STOP - $START + $ELAPSED))
+		HOURS=$(( $TOTAL / 3600 ))
+		MINUTES=$(expr \( $TOTAL - \( $HOURS \* 3600 \) \) / 60  )
+
+	 	LOGTEXT=$DAY" "$TASK" "$HOURS" hrs "$MINUTES" min"
+		printf "* $LOGTEXT\n" >> $LOGFILE
+		echo "saved to logfile:"
+		echo $LOGTEXT
+
+
+		# update the total time spent post in the log file
+		printf "### Total time spent: $(get_total)\n" >> $LOGFILE
+		# remove tempfile
+		rm $TEMPFILE
+	else 
+		echo "no timetracking start point can be found in $TEMPFILE"
+	fi
+elif [ $1 == "log" ]; then
+	if [ -e $TEMPFILE ]; then
+		cat $TEMPFILE
+	else 
+		echo "no timetracking session running"
+	fi
+fi
