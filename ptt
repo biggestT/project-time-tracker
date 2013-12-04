@@ -8,24 +8,60 @@
 TIMELOG_FILENAME="TIMELOG.md"
 TEMPFILE_FILENAME=".timestamp"
 
-# Messages to user
 USAGE_MSG="the project time tracker needs to be run as: ptt [init/start/paus/stop/log] in the root folder of your project"
-NOT_INITIATED_MSG="no project time tracker has been initiated for this folder"
+NOT_INITIATED_MSG="fatal: not a ptt project folder"
+
+# if wrong arguments tell the user how to use the program
+# if [ -z "$1" ]; then
+# 	echo $USAGE_MSG
+# 	exit 1
+# fi
+
+# look for ptt files in parent folders recursively until TIMELOG.md is found
+function find_ptt() {
+	local current_folder="$1"
+
+	local gone_too_far=$(echo $current_folder | grep '\/' | wc -l)
+	if [ $gone_too_far -le 0 ]; then
+		return 1
+	else 
+		local found=$(ls $current_folder | grep $TIMELOG_FILENAME | wc -l)
+		if [ $found -ne 0 ]; then
+			ROOT=$current_folder 
+			return 0
+		else 
+			find_ptt $(echo $current_folder | sed 's/\/[^\/]*$//')
+		fi
+	fi
+}
+
+
+# find a parent directory that has an initiated timelog file
+if ! find_ptt $(pwd); then
+	if [ $1 == "init" ]; then
+		ROOT=$(pwd)
+	elif [ $1 == "start" ] || [ $1 == "stop" ] || [ $1 == "paus" ] || [ $1 == "log" ]; then
+		echo $NOT_INITIATED_MSG
+		exit 1
+	else 
+		echo $USAGE_MSG
+		exit 0
+	fi
+fi
+
+LOGFILE=$(echo $ROOT | sed 's/$/\/'$TIMELOG_FILENAME'/')
+TEMPFILE=$(echo $ROOT | sed 's/$/\/'$TEMPFILE_FILENAME'/')
+REPOSITORY_NAME=$(echo $ROOT | sed 's/.*\///')
+
+# Messages to user that is dependent on paths
 NO_TEMPFILE_MSG="no timetracking start point can be found in $TEMPFILE"
 EXISTING_TEMPFILE_MSG="already existing timetracking log for $REPOSITORY_NAME"
 EXISTING_LOGFILE_MSG="project timetracker already initated for $REPOSITORY_NAME"
 INITIATED_TIMETRACKER_MSG="initiated the project time tracker for project $REPOSITORY_NAME"
 
-# look for ptt files in parent folders recursively until TIMELOG.md is found
-function find_ptt() {
-	local current_folder="$1"
-	local found=$(ls $current_folder | grep $TIMELOG_FILENAME | wc -l)
-	if [ $found -ne 0 ]; then
-		echo $current_folder
-	else 
-		find_ptt $(echo $current_folder | sed 's/\/[^\/]*$//')
-	fi
-}
+# always start by defining the paths of the ptt files for the current repository 
+
+
 # see if the timetracking is paused
 function is_paused() {
 	# see if the paused flag is in the tempfile
@@ -57,20 +93,9 @@ function get_total() {
  echo $total_hrs" hours and "$total_min" minutes "
 }
 
-# find a parent directory that has an initiated timelog file
-ROOT=$(find_ptt $(pwd))
-
-# always start by defining the paths of the ptt files for the current repository 
-LOGFILE=$(echo $ROOT | sed 's/$/\/'$TIMELOG_FILENAME'/')
-TEMPFILE=$(echo $ROOT | sed 's/$/\/'$TEMPFILE_FILENAME'/')
-REPOSITORY_NAME=$(echo $ROOT | sed 's/.*\///')
-
-# if wrong arguments tell the user how to use the program
-if [ -z "$1" ]; then
-	echo $USAGE_MSG
 
 # start time tracking if already running task is not detected in tempfile
-elif [ $1 == "start" ]; then
+if [ "$1" == "start" ]; then
 
 	if [ ! -e $LOGFILE ]; then
 		echo $NOT_INITIATED_MSG
@@ -104,7 +129,7 @@ elif [ $1 == "start" ]; then
 	fi
 
 # temporarily paus a running timetracking session 
-elif [ $1 == "paus" ]; then
+elif [ "$1" == "paus" ]; then
 	if [ -e $TEMPFILE  ]; then
 		if ( is_paused ) then
 			echo $REPOSITORY_NAME" timetracking already paused"
@@ -123,7 +148,7 @@ elif [ $1 == "paus" ]; then
 	fi
 
 # stop timetracking and add it to log.md
-elif [ $1 == "stop" ]; then
+elif [ "$1" == "stop" ]; then
 
 	if [ ! -e $LOGFILE ]; then
 		echo $NOT_INITIATED_MSG
@@ -166,7 +191,7 @@ elif [ $1 == "stop" ]; then
 	fi
 
 # show the logfile of the current timetracking session
-elif [ $1 == "log" ]; then
+elif [ "$1" == "log" ]; then
 	if [ ! -e $TEMPFILE ]; then
 		echo $NO_TEMPFILE_MSG
 	else 
@@ -174,13 +199,11 @@ elif [ $1 == "log" ]; then
 	fi
 
 # initiate a project time tracker for the current working directory
-elif [ $1 == "init" ]; then
-	if [ -e $LOGFILE ]; then
-		echo $EXISTING_LOGFILE_MSG
-	else 
+elif [ "$1" == "init" ]; then
 		printf "## Timelog for $REPOSITORY_NAME\n\n" > $LOGFILE
 		echo $INITIATED_TIMETRACKER_MSG
-	fi
+
 else 
 	echo $USAGE_MSG
+
 fi
