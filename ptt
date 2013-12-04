@@ -7,17 +7,31 @@
 
 LOGFILE=$(pwd | sed 's/.*/TIMELOG.md/')
 TEMPFILE=$(pwd | sed 's/.*/.timestamp/')
+REPOSITORY_NAME=$(pwd | sed 's/.*\///')
 
+# Messages to user
+USAGE_MSG="the project time tracker needs to be run as: ptt [init/start/paus/stop/log] in the root folder of your project"
+NOT_INITIATED_MSG="no project time tracker has been initiated for this folder"
+NO_TEMPFILE_MSG="no timetracking start point can be found in $TEMPFILE"
+EXISTING_TEMPFILE_MSG="already existing timetracking log for $REPOSITORY_NAME"
+EXISTING_LOGFILE_MSG="project timetracker already initated for $REPOSITORY_NAME"
+INITIATED_TIMETRACKER_MSG="initiated the project time tracker for project $REPOSITORY_NAME"
+
+# see if the timetracking is paused
 function is_paused() {
 	# see if the paused flag is in the tempfile
 	local isPaused=$(grep 'paused' $TEMPFILE | wc -l)
 	[ $isPaused -ne 0 ] && return 0 || return 1
 }
+
+# get how much time has elapsed from the tempfile
 function get_elapsed() {
 	# find the elapsed seconds in the tempfile
 	local elapsed=$(grep 'elapsed:[0-9]\{1,12\}$' $TEMPFILE | sed -e s/elapsed://)
 	echo $elapsed
 }
+
+# get the time of the last started timetracking session
 function get_start() {
 	# find the UTC timestamp in the tempfile
 	local start=$(grep 'start:[0-9]\{10,12\}$' $TEMPFILE | sed -e s/start://)
@@ -33,15 +47,20 @@ function get_total() {
  echo $total_hrs" hours and "$total_min" minutes "
 }
 
+# if wrong arguments tell the user how to use the program
 if [ -z "$1" ]; then
-	echo "the project time tracker needs to be run as: tb [init/start/paus/stop/log] in the root folder of your project"
+	echo $USAGE_MSG
+
 # start time tracking if already running task is not detected in tempfile
 elif [ $1 == "start" ]; then
 
-	if [ -e $TEMPFILE ]; then
+	if [ ! -e $LOGFILE ]; then
+		echo $NOT_INITIATED_MSG
 
-		# ISPAUSED=$(grep 'paused' $TEMPFILE | wc -l)
+	# continue existing timetracking session
+	elif [ -e $TEMPFILE ]; then
 
+		# continue if paused
 		if ( is_paused ) then
 
 			NEWSTART=$(date +%s)
@@ -50,23 +69,27 @@ elif [ $1 == "start" ]; then
 			sed -i 's/paused//' $TEMPFILE
 			echo "start:"$NEWSTART >> $TEMPFILE
 			echo "continuing timetracking ..."
-		else 
-			echo $(pwd | sed 's/.*\///')" timetracking already running"
-		fi
 
+		# do nothing if already running
+		else 
+			echo $REPOSITORY_NAME" timetracking already running"
+		fi
+	# start new timetracking session
 	else 
+
 		START=$(date +%s)
 
 		echo "start:"$START > $TEMPFILE
 		echo "elapsed:0" >> $TEMPFILE
 
-		echo $(pwd | sed 's/.*\///')" timelogger started!"
+		echo $REPOSITORY_NAME" timelogger started!"
 	fi
 
+# temporarily paus a running timetracking session 
 elif [ $1 == "paus" ]; then
 	if [ -e $TEMPFILE  ]; then
 		if ( is_paused ) then
-			echo "timetracking already paused"
+			echo $REPOSITORY_NAME" timetracking already paused"
 		else 
 			ELAPSED=$(get_elapsed)
 			START=$(get_start)
@@ -78,21 +101,26 @@ elif [ $1 == "paus" ]; then
 			echo "timetracking paused"
 		fi
 	else 
-		echo "no existing timetracking session can be found in $TEMPFILE"
+		echo $NO_TEMPFILE_MSG
 	fi
 
 # stop timetracking and add it to log.md
 elif [ $1 == "stop" ]; then
 
-
-	# see if starting timestamp exists
-	if [ -e $TEMPFILE  ]; then
+	if [ ! -e $LOGFILE ]; then
+		echo $NOT_INITIATED_MSG
+	elif [ ! -e $TEMPFILE ]; then
+		echo $NO_TEMPFILE_MSG
+	else 
 
 		read -e -p $'what did you work with?\n' TASK
 
 		STOP=$(date +%s)
+
 		# remove any old total time spent line from the logfile
-		sed -i 's/^###.Total time spent:.*$//' $LOGFILE
+		sed -i '/^###.Total time spent:.*$/d' $LOGFILE
+		# ... and unnecessary new lines ?
+		sed -i '/^$/d' $LOGFILE
 
 		if ( is_paused ) then
 			START=$STOP
@@ -108,31 +136,33 @@ elif [ $1 == "stop" ]; then
 		MINUTES=$(expr \( $TOTAL - \( $HOURS \* 3600 \) \) / 60  )
 
 	 	LOGTEXT=$DAY" "$TASK" "$HOURS" hrs "$MINUTES" min"
-		printf "* $LOGTEXT\n" >> $LOGFILE
+		printf "* $LOGTEXT" >> $LOGFILE
 		echo "saved to logfile:"
 		echo $LOGTEXT
 
 
 		# update the total time spent post in the log file
-		printf "### Total time spent: $(get_total)\n" >> $LOGFILE
+		printf "\n\n### Total time spent: $(get_total)" >> $LOGFILE
 		# remove tempfile
 		rm $TEMPFILE
-	else 
-		echo "no timetracking start point can be found in $TEMPFILE"
 	fi
+
+# show the logfile of the current timetracking session
 elif [ $1 == "log" ]; then
-	if [ -e $TEMPFILE ]; then
-		cat $TEMPFILE
+	if [ ! -e $TEMPFILE ]; then
+		echo $NO_TEMPFILE_MSG
 	else 
-		echo "no timetracking session running"
+		cat $TEMPFILE
 	fi
+
+# initiate a project time tracker for the current working directory
 elif [ $1 == "init" ]; then
 	if [ -e $LOGFILE ]; then
-		echo "already existing timetracking log for "$(pwd | sed 's/.*\///')
+		echo $EXISTING_LOGFILE_MSG
 	else 
-		printf "## Timelog\n" > $LOGFILE
-		echo "initiated the project time tracker for project "$(pwd | sed 's/.*\///')
+		printf "## Timelog\n\n" > $LOGFILE
+		echo $INITIATED_TIMETRACKER_MSG
 	fi
 else 
-	echo "the project time tracker needs to be run as: tb [start/paus/stop/log]"
+	echo $USAGE_MSG
 fi
