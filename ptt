@@ -5,9 +5,8 @@
 # repository
 # by Tor Nilsson Ohrn in 2013
 
-LOGFILE=$(pwd | sed 's/.*/TIMELOG.md/')
-TEMPFILE=$(pwd | sed 's/.*/.timestamp/')
-REPOSITORY_NAME=$(pwd | sed 's/.*\///')
+TIMELOG_FILENAME="TIMELOG.md"
+TEMPFILE_FILENAME=".timestamp"
 
 # Messages to user
 USAGE_MSG="the project time tracker needs to be run as: ptt [init/start/paus/stop/log] in the root folder of your project"
@@ -17,6 +16,16 @@ EXISTING_TEMPFILE_MSG="already existing timetracking log for $REPOSITORY_NAME"
 EXISTING_LOGFILE_MSG="project timetracker already initated for $REPOSITORY_NAME"
 INITIATED_TIMETRACKER_MSG="initiated the project time tracker for project $REPOSITORY_NAME"
 
+# look for ptt files in parent folders recursively until TIMELOG.md is found
+function find_ptt() {
+	local current_folder="$1"
+	local found=$(ls $current_folder | grep $TIMELOG_FILENAME | wc -l)
+	if [ $found -ne 0 ]; then
+		echo $current_folder
+	else 
+		find_ptt $(echo $current_folder | sed 's/\/[^\/]*$//')
+	fi
+}
 # see if the timetracking is paused
 function is_paused() {
 	# see if the paused flag is in the tempfile
@@ -38,6 +47,7 @@ function get_start() {
 	echo $start
 }
 
+# get the resulting logfile line that shows the total time spent in hours and minutes
 function get_total() {
  total_hrs=`grep -o '[0-9]\{1,3\}.hrs' $LOGFILE | sed -e s/.hrs// | awk '{hrs+=$1} END {printf hrs}'`
  total_min=`grep -o '[0-9]\{1,2\}.min' $LOGFILE | sed -e s/.min// | awk '{min+=$1} END {printf min}'`
@@ -46,6 +56,14 @@ function get_total() {
  total_min=$(($total_min % 60))
  echo $total_hrs" hours and "$total_min" minutes "
 }
+
+# find a parent directory that has an initiated timelog file
+ROOT=$(find_ptt $(pwd))
+
+# always start by defining the paths of the ptt files for the current repository 
+LOGFILE=$(echo $ROOT | sed 's/$/\/'$TIMELOG_FILENAME'/')
+TEMPFILE=$(echo $ROOT | sed 's/$/\/'$TEMPFILE_FILENAME'/')
+REPOSITORY_NAME=$(echo $ROOT | sed 's/.*\///')
 
 # if wrong arguments tell the user how to use the program
 if [ -z "$1" ]; then
@@ -160,7 +178,7 @@ elif [ $1 == "init" ]; then
 	if [ -e $LOGFILE ]; then
 		echo $EXISTING_LOGFILE_MSG
 	else 
-		printf "## Timelog\n\n" > $LOGFILE
+		printf "## Timelog for $REPOSITORY_NAME\n\n" > $LOGFILE
 		echo $INITIATED_TIMETRACKER_MSG
 	fi
 else 

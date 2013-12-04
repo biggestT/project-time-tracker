@@ -1,8 +1,4 @@
 ## Timelog
-* 2013-12-04 jel 0 hrs 0 min
-* 2013-12-04 jel 0 hrs 0 min
-* 2013-12-04 jel 0 hrs 0 min
-* 2013-12-04 ptt test 0 hrs 0 min
-* 2013-12-04 lite loke 0 hrs 0 min
+* 2013-12-04 git like parent folder search for ptt 1 hrs 4 min
 
-### Total time spent: 0 hours and 0 minutes 
+### Total time spent: 1 hours and 4 minutes 
