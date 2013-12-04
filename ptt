@@ -11,14 +11,17 @@ TEMPFILE_FILENAME=".timestamp"
 USAGE_MSG="the project time tracker needs to be run as: ptt [init/start/paus/stop/log] in the root folder of your project"
 NOT_INITIATED_MSG="fatal: not a ptt project folder"
 
-# if wrong arguments tell the user how to use the program
-# if [ -z "$1" ]; then
-# 	echo $USAGE_MSG
-# 	exit 1
-# fi
+# path to put tab completion file in
+BASH_COMPLETION="/etc/bash_completion.d/ptt"
+
+# source tabcompletion file for ptt 
+if [ -e "$BASH_COMPLETION" ]; then
+	echo $BASH_COMPLETION
+	source $BASH_COMPLETION
+fi
 
 # look for ptt files in parent folders recursively until TIMELOG.md is found
-function find_ptt() {
+function find_root() {
 	local current_folder="$1"
 
 	local gone_too_far=$(echo $current_folder | grep '\/' | wc -l)
@@ -35,9 +38,8 @@ function find_ptt() {
 	fi
 }
 
-
 # find a parent directory that has an initiated timelog file
-if ! find_ptt $(pwd); then
+if ! find_root $(pwd); then
 	if [ $1 == "init" ]; then
 		ROOT=$(pwd)
 	elif [ $1 == "start" ] || [ $1 == "stop" ] || [ $1 == "paus" ] || [ $1 == "log" ]; then
