@@ -33,16 +33,16 @@ function find_root() {
 			ROOT=$current_folder 
 			return 0
 		else 
-			find_ptt $(echo $current_folder | sed 's/\/[^\/]*$//')
+			find_root $(echo $current_folder | sed 's/\/[^\/]*$//')
 		fi
 	fi
 }
 
 # find a parent directory that has an initiated timelog file
 if ! find_root $(pwd); then
-	if [ $1 == "init" ]; then
+	if [ "$1" == "init" ]; then
 		ROOT=$(pwd)
-	elif [ $1 == "start" ] || [ $1 == "stop" ] || [ $1 == "paus" ] || [ $1 == "log" ]; then
+	elif [ "$1" == "start" ] || [ "$1" == "stop" ] || [ "$1" == "paus" ] || [ "$1" == "log" ]; then
 		echo $NOT_INITIATED_MSG
 		exit 1
 	else 
