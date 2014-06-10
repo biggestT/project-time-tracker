@@ -71,22 +71,48 @@ function is_paused() {
 	[ $isPaused -ne 0 ] && return 0 || return 1
 }
 
+#set a new elapsed time in minutes
+set_elapsed() {
+
+	if [ ! -e $TEMPFILE ]; then
+	 echo "elapsed:0" > $TEMPFILE
+	 echo "paused" >> $TEMPFILE
+  fi
+	
+	if [[ $1 -ge 0 ]]; then
+    sed -i "/elapsed/c\elapsed:$1" $TEMPFILE
+  else 
+  	sed -i "/elapsed/c\elapsed:0" $TEMPFILE
+	fi
+}
+    
 # get how much time has elapsed from the tempfile
-function get_elapsed() {
-	# find the elapsed seconds in the tempfile
-	local elapsed=$(grep 'elapsed:[0-9]\{1,12\}$' $TEMPFILE | sed -e s/elapsed://)
-	echo $elapsed
+get_elapsed() {
+	# find the elapsed seconds in the tempfile if it exists
+	if [ -e $TEMPFILE ]; then
+		local elapsed=$(grep 'elapsed:[0-9]\{1,12\}$' $TEMPFILE | sed -e s/elapsed://)
+		echo $elapsed
+	else 
+		echo 0
+	fi
 }
 
 # get the time of the last started timetracking session
-function get_start() {
+get_start() {
 	# find the UTC timestamp in the tempfile
 	local start=$(grep 'start:[0-9]\{10,12\}$' $TEMPFILE | sed -e s/start://)
 	echo $start
 }
 
+check_number() {
+ numExpr='^[0-9]+$'
+    if ! [[ $1 =~ $numExpr ]] ; then
+    	echo "error: should be provided a number" >&2; exit 1
+    fi
+}
+
 # get the resulting logfile line that shows the total time spent in hours and minutes
-function get_total() {
+get_total() {
  total_hrs=`grep -o '[0-9]\{1,3\}.hrs' $LOGFILE | sed -e s/.hrs// | awk '{hrs+=$1} END {printf hrs}'`
  total_min=`grep -o '[0-9]\{1,2\}.min' $LOGFILE | sed -e s/.min// | awk '{min+=$1} END {printf min}'`
 
@@ -121,7 +147,6 @@ if [ "$1" == "start" ]; then
 		fi
 	# start new timetracking session
 	else 
-
 		START=$(date +%s)
 
 		echo "start:"$START > $TEMPFILE
@@ -139,7 +164,10 @@ elif [ "$1" == "paus" ]; then
 			ELAPSED=$(get_elapsed)
 			START=$(get_start)
 			PAUS=$(date +%s)
-			NEWTOTAL=$(expr $PAUS - $START + $ELAPSED)
+			NEWELAPSED=$(expr $PAUS - $START)
+			NEWELAPSED=$(expr $NEWELAPSED / 60)
+			NEWTOTAL=$(expr $NEWELAPSED + $ELAPSED)
+
 			# save the so far elapsed time in the tempfile
 			echo "elapsed:"$NEWTOTAL > $TEMPFILE
 			echo "paused" >> $TEMPFILE
@@ -174,11 +202,13 @@ elif [ "$1" == "stop" ]; then
 		fi
 
 		ELAPSED=$(get_elapsed)
+		NEWELAPSED=$(expr $STOP - $START)
+		NEWELAPSED=$(expr $NEWELAPSED / 60)
 		
 		DAY=$(date +%F)
-		TOTAL=$(( $STOP - $START + $ELAPSED))
-		HOURS=$(( $TOTAL / 3600 ))
-		MINUTES=$(expr \( $TOTAL - \( $HOURS \* 3600 \) \) / 60  )
+		TOTAL=$(expr $NEWELAPSED + $ELAPSED)
+		HOURS=$(( $TOTAL / 60 ))
+		MINUTES=$(expr  $TOTAL - \( $HOURS \* 60 \) )
 
 	 	LOGTEXT=$DAY" "$TASK" "$HOURS" hrs "$MINUTES" min"
 		printf "* $LOGTEXT" >> $LOGFILE
@@ -187,7 +217,7 @@ elif [ "$1" == "stop" ]; then
 
 
 		# update the total time spent post in the log file
-		printf "\n\n### Total time spent: $(get_total)" >> $LOGFILE
+		printf "\n\n### Total time spent: $(get_total)\n" >> $LOGFILE
 		# remove tempfile
 		rm $TEMPFILE
 	fi
@@ -200,6 +230,25 @@ elif [ "$1" == "log" ]; then
 		cat $TEMPFILE
 	fi
 
+
+# manually add minutes to the elapsed time
+elif [ "$1" == "plus" ]; then
+
+    check_number $2
+    NEW_ELAPSED=$(get_elapsed)
+    NEW_ELAPSED=$(expr $NEW_ELAPSED + $2)
+    set_elapsed $NEW_ELAPSED
+    
+    echo "$2 minutes added"
+
+
+elif [ "$1" == "minus" ]; then
+    check_number $2
+    NEW_ELAPSED=$(get_elapsed)
+    NEW_ELAPSED=$(expr $NEW_ELAPSED - $2)
+  	set_elapsed $NEW_ELAPSED
+    echo "$2 minutes subtracted"
+
 # initiate a project time tracker for the current working directory
 elif [ "$1" == "init" ]; then
 		printf "## Timelog for $REPOSITORY_NAME\n\n" > $LOGFILE
@@ -209,3 +258,6 @@ else
 	echo $USAGE_MSG
 
 fi
+
+
+
